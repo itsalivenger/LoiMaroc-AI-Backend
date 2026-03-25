@@ -15,8 +15,19 @@ import random
 
 # Robust path handling for .env
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ENV_PATH = os.path.join(BASE_DIR, "..", "web_app", ".env")
-load_dotenv(dotenv_path=ENV_PATH)
+# Try multiple possible env paths
+ENV_PATHS = [
+    os.path.join(BASE_DIR, "..", "web_app", ".env"), # Local dev sibling
+    os.path.join(BASE_DIR, ".env"),                 # Local in backend
+]
+env_loaded = False
+for path in ENV_PATHS:
+    if os.path.exists(path):
+        load_dotenv(dotenv_path=path)
+        env_loaded = True
+        break
+if not env_loaded:
+    load_dotenv() # Fallback to system environment variables (Vercel)
 
 # MongoDB Configuration
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
@@ -79,7 +90,11 @@ app = FastAPI(title="LoiMaroc AI Backend", lifespan=lifespan)
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://loi-maroc-ai.vercel.app"],
+    allow_origins=[
+        "https://loi-maroc-ai.vercel.app",
+        "https://loi-maroc-ai.vercel.app/",
+        "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
