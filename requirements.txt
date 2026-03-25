@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+motor
+pydantic
+pydantic-settings
+langchain
+langchain-google-genai
+langchain-chroma
+langchain-community
+pytesseract
+pdf2image
+python-multipart
+python-dotenv
+# Base 64 handling for images if needed
+pillow

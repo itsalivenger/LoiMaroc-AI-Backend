@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────
+# LoiMaroc AI · Backend .gitignore
+# ─────────────────────────────────────────────
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+.env.local
+.env.*.local
+
+# Environment & secrets (NEVER commit these)
+.env
+*.env
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Vector store / FAISS indexes
+faiss_index/
+*.faiss
+*.pkl
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
