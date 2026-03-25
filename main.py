@@ -79,7 +79,7 @@ app = FastAPI(title="LoiMaroc AI Backend", lifespan=lifespan)
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://loi-maroc-ai.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
