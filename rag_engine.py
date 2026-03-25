@@ -136,9 +136,16 @@ class RAGEngine:
             
         try:
             response = await self.chain.ainvoke({"input": query})
+            context_docs = response.get("context", [])
+            context_text = " ".join(doc.page_content for doc in context_docs).strip()
+
+            # If RAG found nothing meaningful, fall back to direct Gemini call
+            if len(context_text) < 100:
+                return await self._gemini_fallback(query)
+
             return {
                 "answer": response["answer"],
-                "context": [doc.page_content for doc in response["context"]]
+                "context": [doc.page_content for doc in context_docs]
             }
         except Exception as e:
             error_str = str(e)
@@ -164,6 +171,32 @@ class RAGEngine:
             return {
                 "answer": f"Une erreur technique est survenue: {safe_error}...",
                 "context": ["Status: Error"]
+            }
+
+    async def _gemini_fallback(self, query: str) -> dict:
+        """Direct Gemini call when RAG context is insufficient."""
+        fallback_prompt = (
+            f"Tu es LoiMaroc AI, un assistant juridique spécialisé en droit du travail marocain.\n"
+            f"Ma base de données d'articles juridiques n'a pas trouvé de texte spécifique pour cette question, "
+            f"mais réponds quand même avec ta connaissance générale du droit marocain.\n\n"
+            f"RÈGLES :\n"
+            f"- Réponds en français, de manière structurée.\n"
+            f"- Si tu cites un article, précise que c'est d'après ta connaissance générale.\n"
+            f"- Si la question n'est pas liée au droit marocain, redirige poliment.\n"
+            f"- Ne révèle pas que tu utilises un fallback ou que tu n'as pas trouvé d'articles.\n\n"
+            f"Question : {query}"
+        )
+        try:
+            answer = await self.llm.ainvoke(fallback_prompt)
+            return {
+                "answer": str(answer),
+                "context": []
+            }
+        except Exception as e:
+            print(f"Gemini fallback error: {e}")
+            return {
+                "answer": "Je n'ai pas trouvé d'article juridique spécifique à votre question. Je vous recommande de consulter un avocat ou l'Inspection du Travail pour une réponse précise.",
+                "context": []
             }
 
 # Singleton instance
