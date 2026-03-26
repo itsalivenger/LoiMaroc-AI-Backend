@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
@@ -92,13 +92,28 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://loi-maroc-ai.vercel.app",
-        "https://loi-maroc-ai.vercel.app/",
         "http://localhost:3000"
     ],
+    allow_origin_regex="https://.*\\.vercel\\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    # Log incoming request details
+    origin = request.headers.get("origin")
+    method = request.method
+    url = request.url
+    print(f"DEBUG_CORS: {method} {url} | Origin: {origin}")
+    
+    response = await call_next(request)
+    
+    # Log response details
+    status_code = response.status_code
+    print(f"DEBUG_CORS: Response Status: {status_code}")
+    return response
 
 # Import engine after env is loaded
 try:
@@ -110,6 +125,14 @@ try:
 except Exception as e:
     print(f"Backend: ERROR importing rag_engine: {e}")
     engine = None
+
+@app.get("/api/debug")
+async def debug_headers(request: Request):
+    return {
+        "headers": dict(request.headers),
+        "method": request.method,
+        "url": str(request.url)
+    }
 
 @app.get("/")
 async def root():
