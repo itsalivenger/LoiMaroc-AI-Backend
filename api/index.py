@@ -53,6 +53,10 @@ class ChatSession(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
+class ChatRequest(BaseModel):
+    user_id: str
+    message: str
+
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -155,10 +159,13 @@ async def register(user: UserCreate):
     return {"user_id": str(result.inserted_id), "status": "success"}
 
 @app.post("/api/chat")
-async def chat(user_id: str, message: str):
+async def chat(request_data: ChatRequest):
     if not engine:
         raise HTTPException(status_code=500, detail="RAG engine not available")
     
+    user_id = request_data.user_id
+    message = request_data.message
+
     # Get AI response
     response_data = await engine.get_response(message)
     
