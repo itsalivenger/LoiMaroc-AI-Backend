@@ -111,10 +111,6 @@ except Exception as e:
     print(f"Backend: ERROR importing rag_engine: {e}")
     engine = None
 
-@app.options("/api/{rest_of_path:path}")
-async def preflight_handler():
-    return {"status": "ok"}
-
 @app.get("/")
 async def root():
     return {"status": "LoiMaroc API is running"}
