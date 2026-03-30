@@ -26,15 +26,26 @@ except ImportError:
         from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.documents import Document
 
-# Robust path handling
+# Robust path handling - important for Vercel vs Local
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Check PROJECT ROOT (..) and WEB_APP directory (sibling of PROJECT ROOT)
 ENV_LOCATIONS = [
-    os.path.normpath(os.path.join(BASE_DIR, "..", ".env")),
-    os.path.normpath(os.path.join(BASE_DIR, ".env")),
-    os.path.normpath(os.path.join(BASE_DIR, "..", "..", "web_app", ".env"))
+    os.path.join(BASE_DIR, ".env"),
+    os.path.join(BASE_DIR, "..", ".env"),
+    os.path.join(BASE_DIR, "..", "..", "web_app", ".env")
 ]
-DB_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "code_travail_db"))
+# Try to find the DB folder in multiple locations
+DB_POSSIBILITIES = [
+    os.path.join(BASE_DIR, "code_travail_db"),
+    os.path.join(BASE_DIR, "..", "code_travail_db"),
+    "/tmp/code_travail_db"
+]
+
+DB_DIR = DB_POSSIBILITIES[0]
+for p in DB_POSSIBILITIES:
+    if os.path.exists(p) and os.path.isdir(p):
+        DB_DIR = p
+        break
 
 for env_path in ENV_LOCATIONS:
     if os.path.exists(env_path):
@@ -51,11 +62,19 @@ class RAGEngine:
         print(f"Initializing RAG Engine with DB at: {DB_DIR}")
         
         try:
+            if not GOOGLE_API_KEY:
+                raise ValueError("Missing GOOGLE_API_KEY")
+                
             self.embeddings = GoogleGenerativeAIEmbeddings(
                 model="gemini-embedding-2-preview",
                 task_type='RETRIEVAL_DOCUMENT',
                 google_api_key=GOOGLE_API_KEY
             )
+            
+            # Check if DB_DIR exists before loading
+            if not os.path.exists(DB_DIR):
+                print(f"CRITICAL: DB_DIR {DB_DIR} DOES NOT EXIST.")
+                # We'll still try but it will likely fail or create empty
             
             self.vector_db = Chroma(
                 collection_name='loi_maroc',
@@ -64,7 +83,7 @@ class RAGEngine:
             )
             
             self.llm = GoogleGenerativeAI(
-                model="gemini-2.5-flash",
+                model="gemini-2.0-flash", # Use standard flash model
                 temperature=0,
                 google_api_key=GOOGLE_API_KEY
             )
@@ -73,6 +92,7 @@ class RAGEngine:
             print("RAG Engine successfully initialized.")
         except Exception as e:
             print(f"FAILED to initialize RAG Engine: {e}")
+            self.error_msg = str(e)
             self.chain = None
 
     def _setup_chain(self):
@@ -159,7 +179,9 @@ class RAGEngine:
 
     async def get_response(self, query: str):
         if not self.chain:
-            return {"answer": "Erreur: Le moteur RAG n'est pas initialisé.", "context": []}
+            # Try to re-init if failed before? Or fall back to Gemini directly
+            print("RAG Engine: Chain not ready. Trying fallback.")
+            return await self._gemini_fallback(query)
             
         try:
             response = await self.chain.ainvoke({"input": query})

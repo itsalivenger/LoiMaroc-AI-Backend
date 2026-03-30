@@ -5,8 +5,14 @@ from pydantic import BaseModel, Field
 import json
 import os
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
+import smtplib
+import random
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
+import time
 
 # Robust environment variable loading
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,9 +34,21 @@ for env_path in ENV_PATHS:
 if not env_found:
     print("Backend: No .env file found. Relying on system environment variables.")
 
-# Environment Variables
+# MongoDB Configuration
 MONGODB_URI = os.getenv("MONGODB_URI")
 DATABASE_NAME = os.getenv("DATABASE_NAME", "loi_maroc_db")
+
+# Default Config for app settings
+DEFAULT_CONFIG = {
+    "persistence_threshold": 5,
+    "rag_k": 5,
+    "about_title": "À Propos de LoiMaroc AI",
+    "about_content": "LoiMaroc AI est votre assistant juridique intelligent dédié au droit marocain. Notre mission est de démocratiser l'accés à l'information juridique grâce à l'intelligence artificielle.",
+    "contact_recipient": "aliho.venger@gmail.com",
+    "contact_phone": "+212 600-000000",
+    "linkedin_url": "https://linkedin.com/in/alivenger",
+    "portfolio_url": "https://alivenger.com"
+}
 
 # Models
 class UserLogin(BaseModel):
@@ -133,14 +151,62 @@ async def debug_headers(request: Request):
 async def root():
     return {"status": "LoiMaroc API is running"}
 
-@app.get("/get")
-@app.get("/api/test")
-async def get_test():
-    return {
-        "status": "connected", 
-        "message": "Backend is reachable!",
-        "time": str(datetime.now())
-    }
+@app.get("/api/admin/config")
+async def get_config():
+    config = await app.db.settings.find_one({"type": "app_config"})
+    if not config:
+        return DEFAULT_CONFIG
+    return {k: v for k, v in config.items() if k != "_id" and k != "type"}
+
+@app.post("/api/admin/config")
+async def update_config(new_config: dict):
+    await app.db.settings.update_one(
+        {"type": "app_config"},
+        {"$set": new_config},
+        upsert=True
+    )
+    return new_config
+
+@app.post("/api/contact")
+async def contact_me(
+    name: str = Body(..., embed=True),
+    email: str = Body(..., embed=True),
+    phone: str = Body(None, embed=True),
+    message: str = Body(..., embed=True)
+):
+    try:
+        config = await get_config()
+        recipient = config.get("contact_recipient") or os.getenv("EMAIL_FROM")
+        
+        if not recipient:
+            raise HTTPException(status_code=500, detail="Contact email not configured.")
+
+        smtp_host = os.getenv("SMTP_HOST")
+        smtp_port_str = os.getenv("SMTP_PORT", "587")
+        smtp_port = int(smtp_port_str) if smtp_port_str.isdigit() else 587
+        smtp_user = os.getenv("SMTP_USER")
+        smtp_pass = os.getenv("SMTP_PASS")
+        mail_from = os.getenv("EMAIL_FROM", smtp_user)
+
+        if smtp_host and smtp_user and smtp_pass:
+            msg = MIMEMultipart()
+            msg['From'] = formataddr(("Loi Maroc", str(mail_from)))
+            msg['To'] = str(recipient)
+            msg['Subject'] = f"Nouveau message de {name} (LoiMaroc AI)"
+            
+            body = f"Nom: {name}\nEmail: {email}\nTéléphone: {phone or 'Non fourni'}\n\nMessage:\n{message}"
+            msg.attach(MIMEText(body, 'plain'))
+
+            server = smtplib.SMTP(str(smtp_host), smtp_port)
+            server.starttls()
+            server.login(str(smtp_user), str(smtp_pass))
+            server.send_message(msg)
+            server.quit()
+        
+        return {"status": "success", "message": "Message envoyé avec succès."}
+    except Exception as e:
+        print(f"Contact failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Échec de l'envoi: {str(e)}")
 
 # --- Endpoints ---
 
