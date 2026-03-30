@@ -43,6 +43,7 @@ class UserCreate(BaseModel):
     password: str
 
 class ChatMessage(BaseModel):
+    id: str = Field(default_factory=lambda: str(int(datetime.now().timestamp() * 1000)))
     role: str # 'user' or 'omar'
     content: str
     timestamp: datetime = Field(default_factory=datetime.now)
@@ -80,7 +81,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://loi-maroc-ai.vercel.app",
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "http://localhost:3001"
     ],
     allow_origin_regex="https://.*\\.vercel\\.app",
     allow_credentials=True,
@@ -128,6 +130,15 @@ async def debug_headers(request: Request):
 @app.get("/api/health")
 async def root():
     return {"status": "LoiMaroc API is running"}
+
+@app.get("/get")
+@app.get("/api/test")
+async def get_test():
+    return {
+        "status": "connected", 
+        "message": "Backend is reachable!",
+        "time": str(datetime.now())
+    }
 
 # --- Endpoints ---
 

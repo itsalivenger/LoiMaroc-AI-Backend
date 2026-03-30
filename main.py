@@ -55,6 +55,7 @@ class AdminAuth(BaseModel):
 
 # Message and Session models
 class Message(BaseModel):
+    id: str = Field(default_factory=lambda: str(int(time.time() * 1000)))
     role: str
     content: str
     source: Optional[str] = None
@@ -92,7 +93,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://loi-maroc-ai.vercel.app",
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "http://localhost:3001"
     ],
     allow_origin_regex="https://.*\\.vercel\\.app",
     allow_credentials=True,
@@ -137,6 +139,15 @@ async def debug_headers(request: Request):
 @app.get("/")
 async def root():
     return {"status": "LoiMaroc API is running"}
+
+@app.get("/get")
+@app.get("/api/test")
+async def get_test():
+    return {
+        "status": "connected", 
+        "message": "Backend is reachable!",
+        "time": int(time.time() * 1000)
+    }
 
 @app.get("/api/health")
 async def health_check():
