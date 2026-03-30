@@ -266,7 +266,7 @@ async def login(credentials: UserLogin):
     if not user:
         raise HTTPException(status_code=401, detail="Identifiants incorrects.")
     
-    return {"status": "success", "user": {"name": user["name"], "email": user["email"]}}
+    return {"status": "success", "user": {"id": str(user["_id"]), "name": user["name"], "email": user["email"]}}
 
 @app.get("/api/admin/users")
 async def get_users():

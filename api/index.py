@@ -150,9 +150,12 @@ async def login(credentials: UserLogin):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     return {
-        "user_id": str(user["_id"]),
-        "name": user["name"],
-        "email": user["email"]
+        "status": "success",
+        "user": {
+            "id": str(user["_id"]),
+            "name": user["name"],
+            "email": user["email"]
+        }
     }
 
 @app.post("/api/auth/register")
