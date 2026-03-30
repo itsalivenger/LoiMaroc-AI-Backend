@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_chroma import Chroma
 from langchain_community.retrievers import BM25Retriever
 try:
@@ -82,8 +82,8 @@ class RAGEngine:
                 persist_directory=DB_DIR
             )
             
-            self.llm = GoogleGenerativeAI(
-                model="gemini-2.0-flash", # Use standard flash model
+            self.llm = ChatGoogleGenerativeAI(
+                model="gemini-1.5-flash",
                 temperature=0,
                 google_api_key=GOOGLE_API_KEY
             )
@@ -245,8 +245,9 @@ class RAGEngine:
             }
         except Exception as e:
             print(f"Gemini fallback error: {e}")
+            error_details = str(e)[:100]
             return {
-                "answer": "Je n'ai pas trouvé d'article juridique spécifique à votre question. Je vous recommande de consulter un avocat ou l'Inspection du Travail pour une réponse précise.",
+                "answer": f"Désolé, je rencontre une difficulté technique pour accéder à mes connaissances (Erreur: {error_details}). Veuillez vérifier votre connexion ou réessayer plus tard.",
                 "context": []
             }
 
