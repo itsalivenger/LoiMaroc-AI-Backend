@@ -42,17 +42,18 @@ class UserCreate(BaseModel):
     email: str
     password: str
 
-class ChatMessage(BaseModel):
+class Message(BaseModel):
     id: str = Field(default_factory=lambda: str(int(datetime.now().timestamp() * 1000)))
-    role: str # 'user' or 'omar'
+    role: str
     content: str
-    timestamp: datetime = Field(default_factory=datetime.now)
+    source: Optional[str] = None
 
 class ChatSession(BaseModel):
-    user_id: str
-    messages: List[ChatMessage] = []
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    id: str
+    title: str
+    messages: List[Message]
+    email: Optional[str] = None
+    updatedAt: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
 
 class ChatRequest(BaseModel):
     query: str
@@ -187,18 +188,20 @@ async def chat(request_data: ChatRequest):
     
     # Store in history if session exists
     if session_id:
-        chat_msg_user = ChatMessage(role="user", content=query)
-        chat_msg_omar = ChatMessage(role="omar", content=response_data["answer"])
+        chat_msg_user = Message(role="user", content=query)
+        chat_msg_omar = Message(role="assistant", content=response_data["answer"], source=response_data["context"][0] if response_data["context"] else None)
         
-        await app.db.chats.update_one(
-            {"session_id": session_id},
+        await app.db.sessions.update_one(
+            {"id": session_id},
             {
                 "$push": {"messages": {"$each": [chat_msg_user.dict(), chat_msg_omar.dict()]}},
                 "$set": {
-                    "updated_at": datetime.now(),
-                    "user_email": user_email
+                    "updatedAt": int(datetime.now().timestamp() * 1000),
+                    "email": user_email
                 },
-                "$setOnInsert": {"created_at": datetime.now()}
+                "$setOnInsert": {
+                    "title": query[:50] + "..." if len(query) > 50 else query
+                }
             },
             upsert=True
         )
@@ -208,9 +211,30 @@ async def chat(request_data: ChatRequest):
         "context": response_data["context"]
     }
 
-@app.get("/api/chat/history/{user_id}")
-async def get_history(user_id: str):
-    session = await app.db.chats.find_one({"user_id": user_id})
-    if not session:
-        return {"messages": []}
-    return {"messages": session["messages"]}
+@app.get("/api/sessions/user/{email}", response_model=List[ChatSession])
+async def get_user_sessions(email: str):
+    cursor = app.db.sessions.find({"email": email}).sort("updatedAt", -1)
+    sessions = await cursor.to_list(length=100)
+    return sessions
+
+@app.get("/api/sessions/{session_id}", response_model=ChatSession)
+async def get_session(session_id: str):
+    session = await app.db.sessions.find_one({"id": session_id})
+    if session:
+        return session
+    raise HTTPException(status_code=404, detail="Session not found")
+
+@app.post("/api/sessions")
+async def save_session(session: ChatSession):
+    try:
+        await app.db.sessions.replace_one({"id": session.id}, session.dict(), upsert=True)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str):
+    result = await app.db.sessions.delete_one({"id": session_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"status": "success"}
