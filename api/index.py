@@ -55,8 +55,9 @@ class ChatSession(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
 
 class ChatRequest(BaseModel):
-    user_id: str
-    message: str
+    query: str
+    session_id: Optional[str] = None
+    user_email: Optional[str] = None
 
 from contextlib import asynccontextmanager
 
@@ -174,25 +175,30 @@ async def chat(request_data: ChatRequest):
     if not engine:
         raise HTTPException(status_code=500, detail="RAG engine not available")
     
-    user_id = request_data.user_id
-    message = request_data.message
+    query = request_data.query
+    session_id = request_data.session_id
+    user_email = request_data.user_email
 
     # Get AI response
-    response_data = await engine.get_response(message)
+    response_data = await engine.get_response(query)
     
-    # Store in history
-    chat_msg_user = ChatMessage(role="user", content=message)
-    chat_msg_omar = ChatMessage(role="omar", content=response_data["answer"])
-    
-    await app.db.chats.update_one(
-        {"user_id": user_id},
-        {
-            "$push": {"messages": {"$each": [chat_msg_user.dict(), chat_msg_omar.dict()]}},
-            "$set": {"updated_at": datetime.now()},
-            "$setOnInsert": {"created_at": datetime.now()}
-        },
-        upsert=True
-    )
+    # Store in history if session exists
+    if session_id:
+        chat_msg_user = ChatMessage(role="user", content=query)
+        chat_msg_omar = ChatMessage(role="omar", content=response_data["answer"])
+        
+        await app.db.chats.update_one(
+            {"session_id": session_id},
+            {
+                "$push": {"messages": {"$each": [chat_msg_user.dict(), chat_msg_omar.dict()]}},
+                "$set": {
+                    "updated_at": datetime.now(),
+                    "user_email": user_email
+                },
+                "$setOnInsert": {"created_at": datetime.now()}
+            },
+            upsert=True
+        )
     
     return {
         "answer": response_data["answer"],
