@@ -56,15 +56,26 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 class RAGEngine:
     def __init__(self):
-        if not GOOGLE_API_KEY:
-            print("WARNING: GOOGLE_API_KEY not found in environment.")
-            
+        self.chain = None
+        self.llm = None
+        self.embeddings = None
+        self.vector_db = None
+        self.error_msg = None
+        
         print(f"Initializing RAG Engine with DB at: {DB_DIR}")
         
         try:
             if not GOOGLE_API_KEY:
                 raise ValueError("Missing GOOGLE_API_KEY")
-                
+
+            # 1. Initialize LLM First - Most likely to succeed and useful for fallback
+            self.llm = ChatGoogleGenerativeAI(
+                model="gemini-1.5-flash",
+                temperature=0,
+                google_api_key=GOOGLE_API_KEY
+            )
+
+            # 2. Then try to load legal database
             self.embeddings = GoogleGenerativeAIEmbeddings(
                 model="gemini-embedding-2-preview",
                 task_type='RETRIEVAL_DOCUMENT',
@@ -82,12 +93,7 @@ class RAGEngine:
                 persist_directory=DB_DIR
             )
             
-            self.llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
-                temperature=0,
-                google_api_key=GOOGLE_API_KEY
-            )
-            
+            # 3. Setup Chain
             self.chain = self._setup_chain()
             print("RAG Engine successfully initialized.")
         except Exception as e:
@@ -226,6 +232,12 @@ class RAGEngine:
 
     async def _gemini_fallback(self, query: str) -> dict:
         """Direct Gemini call when RAG context is insufficient."""
+        if not self.llm:
+            return {
+                "answer": "Désolé, je ne peux pas répondre car mon cerveau (LLM) n'est pas initialisé.",
+                "context": []
+            }
+
         fallback_prompt = (
             f"Tu es Omar, un assistant juridique spécialisé en droit du travail marocain.\n"
             f"Ma base de données d'articles juridiques n'a pas trouvé de texte spécifique pour cette question, "
