@@ -250,9 +250,19 @@ class RAGEngine:
             f"Question : {query}"
         )
         try:
-            answer = await self.llm.ainvoke(fallback_prompt)
+            response = await self.llm.ainvoke(fallback_prompt)
+            
+            # Properly extract text content from AIMessage
+            if isinstance(response.content, str):
+                answer_text = response.content
+            elif isinstance(response.content, list):
+                # Join all text parts if it's a list (common in newer Gemini models)
+                answer_text = "".join([part.get("text", "") for part in response.content if isinstance(part, dict) and part.get("type") == "text"])
+            else:
+                answer_text = str(response.content)
+
             return {
-                "answer": str(answer),
+                "answer": answer_text,
                 "context": []
             }
         except Exception as e:
