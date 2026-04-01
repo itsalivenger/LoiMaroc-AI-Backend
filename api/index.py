@@ -78,6 +78,14 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = None
     user_email: Optional[str] = None
 
+class Review(BaseModel):
+    id: str = Field(default_factory=lambda: str(int(datetime.now().timestamp() * 1000)))
+    rating: int
+    comment: str
+    session_id: str
+    user_email: Optional[str] = None
+    createdAt: datetime = Field(default_factory=datetime.now)
+
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -304,3 +312,29 @@ async def delete_session(session_id: str):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"status": "success"}
+
+# --- Review Endpoints ---
+
+@app.post("/api/reviews")
+async def create_review(review: Review):
+    try:
+        # Check if review already exists for this session
+        existing = await app.db.reviews.find_one({"session_id": review.session_id})
+        if existing:
+            raise HTTPException(status_code=400, detail="Review already submitted for this session")
+        
+        review_dict = review.dict()
+        # Convert datetime to string or ISO format for MongoDB if needed, 
+        # but motor usually handles datetime objects fine.
+        await app.db.reviews.insert_one(review_dict)
+        return {"status": "success", "id": review.id}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@app.get("/api/admin/reviews", response_model=List[Review])
+async def get_reviews():
+    cursor = app.db.reviews.find().sort("createdAt", -1)
+    reviews = await cursor.to_list(length=200)
+    return reviews
