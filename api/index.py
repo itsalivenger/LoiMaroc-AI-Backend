@@ -237,16 +237,21 @@ async def login(credentials: UserLogin):
         }
     }
 
-    raise HTTPException(status_code=401, detail="Invalid admin credentials")
-
 @app.post("/api/admin/login")
 async def admin_login(credentials: AdminLogin):
+    # Get admin credentials from env, or use defaults
     admin_user = os.getenv("ADMIN_USER", "admin")
     admin_pass = os.getenv("ADMIN_PASS", "admin123")
+    admin_email = os.getenv("ADMIN_EMAIL", "emailtrash226@gmail.com")
     
-    if credentials.username == admin_user and credentials.password == admin_pass:
+    # Allow login with either username or email as the 'username' field
+    is_valid_user = (credentials.username == admin_user or credentials.username == admin_email)
+    is_valid_pass = (credentials.password == admin_pass)
+    
+    if is_valid_user and is_valid_pass:
         return {"status": "success", "message": "Admin logged in"}
     
+    print(f"FAILED_ADMIN_LOGIN: Attempt by {credentials.username}")
     raise HTTPException(status_code=401, detail="Invalid admin credentials")
 
 # --- Admin Management Endpoints ---
