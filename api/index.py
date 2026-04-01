@@ -44,10 +44,10 @@ DEFAULT_CONFIG = {
     "rag_k": 5,
     "about_title": "À Propos de LoiMaroc AI",
     "about_content": "LoiMaroc AI est votre assistant juridique intelligent dédié au droit marocain. Notre mission est de démocratiser l'accés à l'information juridique grâce à l'intelligence artificielle.",
-    "contact_recipient": "aliho.venger@gmail.com",
-    "contact_phone": "+212 600-000000",
-    "linkedin_url": "https://linkedin.com/in/alivenger",
-    "portfolio_url": "https://alivenger.com"
+    "contact_recipient": "alihoussa16@gmail.com",
+    "contact_phone": "+212 776 41 25 46",
+    "linkedin_url": "https://www.linkedin.com/in/ali-ait-houssa/",
+    "portfolio_url": ""
 }
 
 # Models
