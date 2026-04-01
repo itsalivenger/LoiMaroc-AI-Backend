@@ -55,6 +55,10 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
+class AdminLogin(BaseModel):
+    username: str
+    password: str
+
 class UserCreate(BaseModel):
     name: str
     email: str
@@ -232,6 +236,74 @@ async def login(credentials: UserLogin):
             "email": user["email"]
         }
     }
+
+    raise HTTPException(status_code=401, detail="Invalid admin credentials")
+
+@app.post("/api/admin/login")
+async def admin_login(credentials: AdminLogin):
+    admin_user = os.getenv("ADMIN_USER", "admin")
+    admin_pass = os.getenv("ADMIN_PASS", "admin123")
+    
+    if credentials.username == admin_user and credentials.password == admin_pass:
+        return {"status": "success", "message": "Admin logged in"}
+    
+    raise HTTPException(status_code=401, detail="Invalid admin credentials")
+
+# --- Admin Management Endpoints ---
+
+@app.get("/api/admin/users")
+async def get_all_users():
+    cursor = app.db.users.find().sort("created_at", -1)
+    users = await cursor.to_list(length=1000)
+    # Map _id to id and remove password
+    for user in users:
+        user["id"] = str(user["_id"])
+        user.pop("_id", None)
+        user.pop("password", None)
+        # Ensure createdAt exists for frontend
+        if "created_at" in user:
+            user["createdAt"] = int(user["created_at"].timestamp() * 1000)
+        else:
+            user["createdAt"] = int(datetime.now().timestamp() * 1000)
+        # Default verified to false if not present
+        if "verified" not in user:
+            user["verified"] = False
+    return users
+
+@app.delete("/api/admin/users/{email}")
+async def delete_user(email: str):
+    # Delete user
+    user_result = await app.db.users.delete_one({"email": email})
+    # Delete all sessions associated with this email
+    sessions_result = await app.db.sessions.delete_many({"email": email})
+    
+    if user_result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"status": "success", "deleted_sessions": sessions_result.deleted_count}
+
+@app.patch("/api/admin/users/{email}/verify")
+async def toggle_user_verify(email: str):
+    user = await app.db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_status = not user.get("verified", False)
+    await app.db.users.update_one({"email": email}, {"$set": {"verified": new_status}})
+    return {"status": "success", "verified": new_status}
+
+@app.get("/api/admin/sessions", response_model=List[ChatSession])
+async def get_all_sessions():
+    cursor = app.db.sessions.find().sort("updatedAt", -1)
+    sessions = await cursor.to_list(length=1000)
+    return sessions
+
+@app.delete("/api/admin/sessions/{session_id}")
+async def admin_delete_session(session_id: str):
+    result = await app.db.sessions.delete_one({"id": session_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"status": "success"}
 
 @app.post("/api/auth/register")
 async def register(user: UserCreate):
