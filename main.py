@@ -55,7 +55,7 @@ class AdminAuth(BaseModel):
 
 # Message and Session models
 class Message(BaseModel):
-    id: str = Field(default_factory=lambda: str(int(time.time() * 1000)))
+    id: str = Field(default_factory=lambda: f"{int(time.time() * 1000)}-{random.randint(1000, 9999)}")
     role: str
     content: str
     source: Optional[str] = None

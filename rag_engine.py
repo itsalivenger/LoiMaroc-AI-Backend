@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI, ChatGoogleGenerativeAI
 from langchain_chroma import Chroma
 from langchain_community.retrievers import BM25Retriever
 try:
@@ -63,7 +63,7 @@ class RAGEngine:
                 persist_directory=DB_DIR
             )
             
-            self.llm = GoogleGenerativeAI(
+            self.llm = ChatGoogleGenerativeAI(
                 model="gemini-2.5-flash",
                 temperature=0,
                 google_api_key=GOOGLE_API_KEY
@@ -157,6 +157,23 @@ class RAGEngine:
         self._format_docs = format_docs
         return create_retrieval_chain(mq_retriever, question_answer_chain)
 
+    def _clean_answer(self, ans):
+        if ans is None:
+            return ""
+        if hasattr(ans, "content"):
+            ans = ans.content
+        if isinstance(ans, list):
+            parts = []
+            for item in ans:
+                if isinstance(item, dict) and "text" in item:
+                    parts.append(item["text"])
+                elif isinstance(item, str):
+                    parts.append(item)
+            ans = "".join(parts)
+        if isinstance(ans, dict) and "text" in ans:
+            ans = ans["text"]
+        return str(ans)
+
     async def get_response(self, query: str):
         if not self.chain:
             return {"answer": "Erreur: Le moteur RAG n'est pas initialisé.", "context": []}
@@ -190,7 +207,7 @@ class RAGEngine:
                     sources.append(ref)
 
             return {
-                "answer": response["answer"],
+                "answer": self._clean_answer(response["answer"]),
                 "context": sources if sources else [doc.page_content[:80] + "..." for doc in context_docs]
             }
         except Exception as e:
@@ -202,7 +219,7 @@ class RAGEngine:
                     await asyncio.sleep(2)
                     response = await self.chain.ainvoke({"input": query})
                     return {
-                        "answer": response["answer"],
+                        "answer": self._clean_answer(response["answer"]),
                         "context": [doc.page_content for doc in response["context"]]
                     }
                 except:
@@ -235,7 +252,7 @@ class RAGEngine:
         try:
             answer = await self.llm.ainvoke(fallback_prompt)
             return {
-                "answer": str(answer),
+                "answer": self._clean_answer(answer),
                 "context": []
             }
         except Exception as e:
