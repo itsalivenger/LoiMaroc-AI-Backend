@@ -34,7 +34,10 @@ ENV_LOCATIONS = [
     os.path.normpath(os.path.join(BASE_DIR, "..", ".env")),
     os.path.normpath(os.path.join(BASE_DIR, "..", "web_app", ".env"))
 ]
-DB_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "code_travail_db"))
+# Check both local backend folder (packaged for deployment) and sibling dir
+DB_DIR = os.path.normpath(os.path.join(BASE_DIR, "code_travail_db"))
+if not os.path.exists(DB_DIR):
+    DB_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "code_travail_db"))
 
 for env_path in ENV_LOCATIONS:
     if os.path.exists(env_path):
