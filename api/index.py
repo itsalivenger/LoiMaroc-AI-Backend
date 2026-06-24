@@ -222,20 +222,6 @@ async def contact_me(
 
 # --- Endpoints ---
 
-@app.post("/api/auth/login")
-async def login(credentials: UserLogin):
-    user = await app.db.users.find_one({"email": credentials.email})
-    if not user or user["password"] != credentials.password:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    return {
-        "status": "success",
-        "user": {
-            "id": str(user["_id"]),
-            "name": user["name"],
-            "email": user["email"]
-        }
-    }
 
 @app.post("/api/admin/login")
 async def admin_login(credentials: AdminLogin):
@@ -310,20 +296,8 @@ async def admin_delete_session(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
     return {"status": "success"}
 
-@app.post("/api/auth/register")
-async def register(user: UserCreate):
-    existing_user = await app.db.users.find_one({"email": user.email})
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    new_user = {
-        "name": user.name,
-        "email": user.email,
-        "password": user.password,
-        "created_at": datetime.now()
-    }
-    result = await app.db.users.insert_one(new_user)
-    return {"user_id": str(result.inserted_id), "status": "success"}
+# Authentication is now handled by Next.js API routes (/api/auth/*)
+
 
 @app.get("/api/admin/stats")
 async def get_admin_stats():

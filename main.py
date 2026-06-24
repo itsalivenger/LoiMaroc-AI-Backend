@@ -187,86 +187,8 @@ async def update_config(new_config: dict):
     )
     return new_config
 
-# Authentication Endpoints
-@app.post("/api/auth/register")
-async def register(user: UserAuth):
-    # Check if user already exists in main users
-    existing_user = await db.users.find_one({"email": user.email})
-    if existing_user:
-        raise HTTPException(status_code=400, detail="L'email est déjà utilisé.")
-    
-    # Generate 6-digit code
-    code = str(random.randint(100000, 999999))
-    
-    # Save to pending (overwrite if exists)
-    user_data = user.model_dump()
-    user_data["code"] = code
-    user_data["expiresAt"] = int(time.time() * 1000) + (15 * 60 * 1000) # 15 mins
-    
-    await db.pending_registrations.update_one(
-        {"email": user.email},
-        {"$set": user_data},
-        upsert=True
-    )
+# Authentication is now handled by Next.js API routes (/api/auth/*)
 
-    # EMAIL SENDING LOGIC (Placeholder for variables)
-    try:
-        smtp_host = os.getenv("SMTP_HOST")
-        smtp_port_str = os.getenv("SMTP_PORT", "587")
-        smtp_port = int(smtp_port_str) if smtp_port_str.isdigit() else 587
-        smtp_user = os.getenv("SMTP_USER")
-        smtp_pass = os.getenv("SMTP_PASS")
-        mail_from = os.getenv("EMAIL_FROM", smtp_user)
-
-        if smtp_host and smtp_user and smtp_pass:
-            msg = MIMEMultipart()
-            # Use formataddr for professional "LoiMaroc AI" sender identity
-            msg['From'] = formataddr(("LoiMaroc AI", str(mail_from or smtp_user)))
-            msg['To'] = str(user.email)
-            msg['Subject'] = "Votre code de vérification LoiMaroc AI"
-            
-            body = f"Bonjour {user.name},\n\nVotre code de vérification est : {code}\n\nCe code expirera dans 15 minutes."
-            msg.attach(MIMEText(body, 'plain'))
-
-            server = smtplib.SMTP(str(smtp_host), smtp_port)
-            server.starttls()
-            server.login(str(smtp_user), str(smtp_pass))
-            server.send_message(msg)
-            server.quit()
-    except Exception as e:
-        print(f"Failed to send email: {e}")
-        # In a real app, maybe don't fail registration if only mail fails, 
-        # but here we want to ensure the code is sent.
-    
-    return {"status": "success", "message": "Code de vérification envoyé."}
-
-@app.post("/api/auth/verify")
-async def verify(request: VerifyRequest):
-    pending = await db.pending_registrations.find_one({"email": request.email, "code": request.code})
-    
-    if not pending:
-        raise HTTPException(status_code=400, detail="Code incorrect ou expiré.")
-    
-    # Move to users
-    user_data = {k: v for k, v in pending.items() if k not in ["_id", "code", "expiresAt"]}
-    # Use update to avoid lint issues with item assignment on Pydantic/Motor dicts
-    user_data.update({
-        "verified": True,
-        "createdAt": int(time.time() * 1000)
-    })
-    
-    await db.users.insert_one(user_data)
-    await db.pending_registrations.delete_one({"email": request.email})
-    
-    return {"status": "success", "message": "Compte vérifié avec succès."}
-
-@app.post("/api/auth/login")
-async def login(credentials: UserLogin):
-    user = await db.users.find_one({"email": credentials.email, "password": credentials.password})
-    if not user:
-        raise HTTPException(status_code=401, detail="Identifiants incorrects.")
-    
-    return {"status": "success", "user": {"id": str(user["_id"]), "name": user["name"], "email": user["email"]}}
 
 @app.get("/api/admin/users")
 async def get_users():
