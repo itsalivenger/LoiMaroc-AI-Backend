@@ -70,7 +70,7 @@ class RAGEngine:
 
             # 1. Initialize LLM First - Most likely to succeed and useful for fallback
             self.llm = ChatGoogleGenerativeAI(
-                model="gemini-3-flash-preview",
+                model="gemini-2.5-flash",
                 temperature=0,
                 google_api_key=GOOGLE_API_KEY
             )
@@ -178,6 +178,23 @@ class RAGEngine:
         self._format_docs = format_docs
         return create_retrieval_chain(mq_retriever, question_answer_chain)
 
+    def _clean_answer(self, ans):
+        if ans is None:
+            return ""
+        if hasattr(ans, "content"):
+            ans = ans.content
+        if isinstance(ans, list):
+            parts = []
+            for item in ans:
+                if isinstance(item, dict) and "text" in item:
+                    parts.append(item["text"])
+                elif isinstance(item, str):
+                    parts.append(item)
+            ans = "".join(parts)
+        if isinstance(ans, dict) and "text" in ans:
+            ans = ans["text"]
+        return str(ans)
+
     async def get_response(self, query: str, history: List[Dict[str, str]] = None):
         if not self.chain:
             # Try to re-init if failed before? Or fall back to Gemini directly
@@ -225,7 +242,7 @@ class RAGEngine:
                     sources.append(ref)
 
             return {
-                "answer": response["answer"],
+                "answer": self._clean_answer(response["answer"]),
                 "context": sources if sources else [doc.page_content[:80] + "..." for doc in context_docs]
             }
         except Exception as e:
@@ -276,7 +293,7 @@ class RAGEngine:
                 answer_text = str(response.content)
 
             return {
-                "answer": answer_text,
+                "answer": self._clean_answer(answer_text),
                 "context": []
             }
         except Exception as e:
